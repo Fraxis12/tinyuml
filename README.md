@@ -1,4 +1,42 @@
+# TinyUML 0.13_02
 
+TinyUML es una herramienta en Java (Swing) para crear diagramas UML 2: clases, paquetes, componentes, notas y relaciones. El proyecto original es de Wei-ju Wu (2007, licencia GPL v2). Esta versión es una continuación con mejoras en la barra de estado, la selección, la eliminación y el zoom.
+
+## Requisitos
+- Java 11 o superior (probado con Java 21).
+- Maven 3.x y conexión a internet la primera vez, para descargar las dependencias.
+
+## Compilar y ejecutar
+Desde la carpeta `tinyuml-0.13_02`:
+
+```
+mvn -DskipTests package
+mvn dependency:copy-dependencies
+java -cp "target/tinyuml-0.13_02.jar:target/dependency/*" org.tinyuml.Main
+```
+
+En Windows se usa `;` en lugar de `:` en el classpath. Se usa `-DskipTests` porque la prueba `UmlClassTest.testInitial` ya fallaba en el proyecto original (comparte un objeto prototipo entre pruebas); el resto de las pruebas (277 de 278) pasa.
+
+## Cambios respecto a la versión original
+
+### Compilación (solo `pom.xml`)
+- Versión de Java de `1.6` a `release 8` y codificación ISO-8859-1.
+- Batik de `batik:batik-*:1.6-1` a `org.apache.xmlgraphics:batik-*:1.17`, y JUnit de 4.0 a 4.13.2.
+- Plugin de pruebas (surefire) 2.22.2 con `--add-opens java.base/java.lang=ALL-UNNAMED`, necesario para que cglib funcione en Java 17 o superior.
+- Se quitó el plugin `exec`, que lanzaba la aplicación durante `verify`.
+
+### Funciones nuevas
+| Requisito | Qué hace | Archivos |
+|---|---|---|
+| RF-001 Conteo por categoría | La barra de estado muestra `Total Items: 06 \| Package: 02 \| Class: 02 \| Component: 02 \| Note: 00`. Se actualiza al crear, eliminar, pegar, deshacer, rehacer, abrir o crear un modelo. Las relaciones no se cuentan. | `AppFrame.java` |
+| RF-002 Elemento seleccionado | La barra de estado muestra la categoría y el nombre del elemento seleccionado (`Selección: Class - Cliente`), o `Sin selección` (también al hacer clic en el gris del diagrama). | `AppFrame.java` |
+| RF-003 Cantidad seleccionada | La barra de estado muestra `Seleccionados: N` y `0` al quitar la selección. Se añadió **Ctrl+clic** para agregar o quitar elementos de la selección. | `AppFrame.java`, `SelectionHandler.java` |
+| RF-004 Confirmar eliminación múltiple | Al eliminar más de un elemento se pide confirmación con la cantidad (`¿Eliminar N elementos?`). Si se cancela, los elementos permanecen. Aplica al menú, la barra, el menú contextual y la tecla Supr. | `DiagramEditor.java` |
+| RF-005 Ajustar a la ventana | **Ver → Ajustar a ventana** (Ctrl+0) ajusta el zoom y la posición visible para ver todos los elementos, sin cambiar su posición ni tamaño. Además: Ctrl y +/− y Ctrl+rueda del ratón para acercar y alejar (10 % a 400 %). | `DiagramEditor.java`, `Scaling.java`, `MenuManager.java`, `EditorCommandDispatcher.java`, archivos de textos |
+
+---
+
+## Información de la versión original
 
 The current version is 0.13_02
 It is possible to save and open model files now, as well as to create a number
