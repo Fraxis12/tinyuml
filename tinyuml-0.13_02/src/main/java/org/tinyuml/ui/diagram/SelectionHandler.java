@@ -20,6 +20,7 @@
 package org.tinyuml.ui.diagram;
 
 import java.awt.Cursor;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -85,6 +86,12 @@ public class SelectionHandler implements EditorMode {
    */
   private void handleSelectionOnMouseClicked(EditorMouseEvent e) {
     double mx = e.getX(), my = e.getY();
+    if (e.getMouseEvent().isControlDown()) {
+      toggleInSelection(editor.getDiagram().getChildAt(mx, my));
+      editor.redraw();
+      notifyListeners();
+      return;
+    }
     // this is a pretty ugly cast, it is needed in order to use the getLabel()
     // method which is not a base DiagramElement method
     DiagramElement previousSelected = currentSelection.getElement();
@@ -107,6 +114,32 @@ public class SelectionHandler implements EditorMode {
     }
     editor.redraw();
     notifyListeners();
+  }
+
+  /**
+   * Adds the element to the current selection, or removes it if it is already
+   * selected (Ctrl+click).
+   * @param element the clicked element
+   */
+  private void toggleInSelection(DiagramElement element) {
+    if (element == NullElement.getInstance() || element == editor.getDiagram()) {
+      return;
+    }
+    List<DiagramElement> elements =
+      new ArrayList<DiagramElement>(currentSelection.getElements());
+    elements.remove(editor.getDiagram());
+    if (elements.contains(element)) {
+      elements.remove(element);
+    } else {
+      elements.add(element);
+    }
+    if (elements.isEmpty()) {
+      currentSelection = NullSelection.getInstance();
+    } else if (elements.size() == 1) {
+      currentSelection = elements.get(0).getSelection(editor);
+    } else {
+      currentSelection = new MultiSelection(editor, elements);
+    }
   }
 
   /**
@@ -138,6 +171,8 @@ public class SelectionHandler implements EditorMode {
    */
   private void handleSelectionOnMousePress(EditorMouseEvent e) {
     double mx = e.getX(), my = e.getY();
+    // Ctrl+click only adds/removes an element, it is handled on mouseClicked
+    if (e.isMainButton() && e.getMouseEvent().isControlDown()) return;
     currentSelection = getSelection(mx, my);
     // Dragging only if left mouse button was pressed
     if (e.isMainButton()) {
