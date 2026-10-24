@@ -46,10 +46,15 @@ import javax.swing.JTabbedPane;
 import javax.swing.JToolBar;
 import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import org.tinyuml.draw.AbstractCompositeNode;
 import org.tinyuml.draw.Label;
 import org.tinyuml.draw.DiagramElement;
 import org.tinyuml.draw.LabelChangeListener;
 import org.tinyuml.model.UmlModel;
+import org.tinyuml.umldraw.shared.NoteElement;
+import org.tinyuml.umldraw.structure.ClassElement;
+import org.tinyuml.umldraw.structure.ComponentElement;
+import org.tinyuml.umldraw.structure.PackageElement;
 import org.tinyuml.util.AppCommandListener;
 import org.tinyuml.umldraw.structure.StructureDiagram;
 import org.tinyuml.model.UmlModelImpl;
@@ -80,6 +85,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
   private JTabbedPane tabbedPane;
   private JLabel coordLabel = new JLabel("    ");
   private JLabel memLabel = new JLabel("    ");
+  private JLabel countLabel = new JLabel("    ");
   private UmlModel umlModel;
   private DiagramEditor currentEditor;
   private transient Timer timer = new Timer();
@@ -205,6 +211,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
     staticToolbarManager.addCommandListener(editorDispatcher);
     editorPanel.add(spane, BorderLayout.CENTER);
     editorPanel.add(toolbar, BorderLayout.NORTH);
+    updateElementCount(currentEditor);
     final Component comp = tabbedPane.add(diagram.getLabelText(), editorPanel);
     diagram.addNameLabelChangeListener(new LabelChangeListener() {
       /** {@inheritDoc} */
@@ -241,6 +248,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
   private void installStatusbar() {
     JPanel statusbar = new JPanel(new BorderLayout());
     statusbar.add(coordLabel, BorderLayout.WEST);
+    statusbar.add(countLabel, BorderLayout.CENTER);
     statusbar.add(memLabel, BorderLayout.EAST);
     getContentPane().add(statusbar, BorderLayout.SOUTH);
   }
@@ -284,6 +292,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
     // spring loading is implemented here
     staticToolbarManager.doClick("SELECT_MODE");
     updateMenuAndToolbars(editor);
+    updateElementCount(editor);
   }
 
   /**
@@ -291,6 +300,39 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
    */
   public void elementRemoved(DiagramEditor editor) {
     updateMenuAndToolbars(editor);
+    updateElementCount(editor);
+  }
+
+  /**
+   * Shows the total and per-category element count of the editor's diagram
+   * in the status bar. Connections are not counted.
+   * @param editor the editor
+   */
+  private void updateElementCount(DiagramEditor editor) {
+    int[] counts = new int[4];
+    countElements(editor.getDiagram(), counts);
+    countLabel.setText(String.format(
+      "Total Items: %02d | Package: %02d | Class: %02d | Component: %02d"
+      + " | Note: %02d", counts[0] + counts[1] + counts[2] + counts[3],
+      counts[0], counts[1], counts[2], counts[3]));
+  }
+
+  /**
+   * Counts the packages, classes, components and notes below the parent,
+   * including nested ones.
+   * @param parent the parent node
+   * @param counts array receiving package, class, component, note counts
+   */
+  private void countElements(AbstractCompositeNode parent, int[] counts) {
+    for (DiagramElement child : parent.getChildren()) {
+      if (child instanceof PackageElement) counts[0]++;
+      else if (child instanceof ClassElement) counts[1]++;
+      else if (child instanceof ComponentElement) counts[2]++;
+      else if (child instanceof NoteElement) counts[3]++;
+      if (child instanceof AbstractCompositeNode) {
+        countElements((AbstractCompositeNode) child, counts);
+      }
+    }
   }
 
   /**
