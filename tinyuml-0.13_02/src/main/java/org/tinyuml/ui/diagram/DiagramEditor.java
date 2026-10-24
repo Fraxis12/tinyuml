@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
+import javax.swing.JOptionPane;
 import javax.swing.JFrame;
 import javax.swing.KeyStroke;
 import javax.swing.event.UndoableEditEvent;
@@ -252,6 +253,12 @@ DiagramEditorNotification, DiagramOperations, NodeChangeListener {
    */
   public void deleteSelection() {
     Collection<DiagramElement> elements = getSelectedElements();
+    if (elements.size() > 1 && JOptionPane.showConfirmDialog(this,
+        "\u00bfEliminar " + elements.size() + " elementos?",
+        "Confirmar eliminaci\u00f3n", JOptionPane.OK_CANCEL_OPTION,
+        JOptionPane.WARNING_MESSAGE) != JOptionPane.OK_OPTION) {
+      return;
+    }
     execute(new DeleteElementCommand(this, elements));
   }
   /**
