@@ -43,6 +43,15 @@ public final class Scaling {
   }
 
   /**
+   * Creates a Scaling with an arbitrary scale factor.
+   * @param scaleFactor the scaling factor
+   * @return the Scaling
+   */
+  public static Scaling of(double scaleFactor) {
+    return new Scaling(scaleFactor);
+  }
+
+  /**
    * Returns the scaling factor.
    * @return the scaling factor
    */

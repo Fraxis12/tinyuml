@@ -20,9 +20,11 @@
 package org.tinyuml.ui.diagram;
 
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
@@ -30,6 +32,8 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.awt.geom.Dimension2D;
 import java.awt.geom.Point2D;
 import java.io.IOException;
@@ -41,8 +45,11 @@ import java.util.List;
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JOptionPane;
+import javax.swing.JViewport;
 import javax.swing.JFrame;
+import javax.swing.JScrollPane;
 import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
 import javax.swing.event.UndoableEditEvent;
 import javax.swing.event.UndoableEditListener;
 import javax.swing.undo.UndoManager;
@@ -96,6 +103,7 @@ implements ActionListener, MouseListener, MouseMotionListener,
 DiagramEditorNotification, DiagramOperations, NodeChangeListener {
 
   // For now, we define the margins of the diagram as constants
+  private static final double ZOOM_STEP = 1.1;
   private static final double MARGIN_TOP = 25;
   private static final double MARGIN_LEFT = 25;
   private static final double MARGIN_RIGHT = 30;
@@ -206,9 +214,12 @@ DiagramEditorNotification, DiagramOperations, NodeChangeListener {
    * This also influences the scroll pane which the component is contained in.
    */
   private void setToDiagramSize() {
+    double factor = scaling.getScaleFactor();
     setPreferredSize(new Dimension(
-      (int) (diagram.getSize().getWidth() + MARGIN_RIGHT + MARGIN_LEFT),
-      (int) (diagram.getSize().getHeight() + MARGIN_BOTTOM + MARGIN_TOP)));
+      (int) ((diagram.getSize().getWidth() + MARGIN_RIGHT + MARGIN_LEFT)
+        * factor),
+      (int) ((diagram.getSize().getHeight() + MARGIN_BOTTOM + MARGIN_TOP)
+        * factor)));
     invalidate();
   }
 
@@ -235,6 +246,92 @@ DiagramEditorNotification, DiagramOperations, NodeChangeListener {
       /** {@inheritDoc} */
       public void actionPerformed(ActionEvent e) { deleteSelection(); }
     });
+    installZoomControls();
+  }
+
+  /**
+   * Installs the zoom controls: Ctrl + / Ctrl - and Ctrl + mouse wheel zoom
+   * in and out, Ctrl 0 fits the diagram to the window.
+   */
+  private void installZoomControls() {
+    bindKeys("zoomIn", new String[] {"control EQUALS", "control PLUS",
+      "control ADD"}, new AbstractAction() {
+      /** {@inheritDoc} */
+      public void actionPerformed(ActionEvent e) { zoomBy(ZOOM_STEP, null); }
+    });
+    bindKeys("zoomOut", new String[] {"control MINUS", "control SUBTRACT"},
+      new AbstractAction() {
+      /** {@inheritDoc} */
+      public void actionPerformed(ActionEvent e) { zoomBy(1 / ZOOM_STEP, null); }
+    });
+    bindKeys("fitToWindow", new String[] {"control 0", "control NUMPAD0"},
+      new AbstractAction() {
+      /** {@inheritDoc} */
+      public void actionPerformed(ActionEvent e) { fitToWindow(); }
+    });
+    addMouseWheelListener(new MouseWheelListener() {
+      /** {@inheritDoc} */
+      public void mouseWheelMoved(MouseWheelEvent e) {
+        if (e.isControlDown()) {
+          zoomBy(e.getWheelRotation() < 0 ? ZOOM_STEP : 1 / ZOOM_STEP,
+            e.getPoint());
+        } else {
+          // keep the normal scrolling of the scroll pane
+          Component pane = SwingUtilities.getAncestorOfClass(
+            JScrollPane.class, DiagramEditor.this);
+          if (pane != null) {
+            pane.dispatchEvent(SwingUtilities.convertMouseEvent(
+              DiagramEditor.this, e, pane));
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Binds the key strokes to the action.
+   * @param name the action name
+   * @param keys the key strokes
+   * @param action the action
+   */
+  private void bindKeys(String name, String[] keys, AbstractAction action) {
+    for (String key : keys) {
+      getInputMap(WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(key),
+        name);
+    }
+    getActionMap().put(name, action);
+  }
+
+  /**
+   * Multiplies the current zoom by the factor, keeping the point under the
+   * anchor in place. The elements are not modified.
+   * @param factor the factor to multiply the zoom with
+   * @param anchor the point (editor coordinates) to keep fixed, or null for
+   * the center of the visible area
+   */
+  private void zoomBy(double factor, Point anchor) {
+    double oldFactor = scaling.getScaleFactor();
+    double newFactor = Math.max(0.1, Math.min(4.0, oldFactor * factor));
+    if (newFactor == oldFactor) return;
+    JViewport viewport = (getParent() instanceof JViewport) ?
+      (JViewport) getParent() : null;
+    Point view = viewport != null ? viewport.getViewPosition() : new Point();
+    if (anchor == null && viewport != null) {
+      anchor = new Point(view.x + viewport.getWidth() / 2,
+        view.y + viewport.getHeight() / 2);
+    }
+    setScaling(Scaling.of(newFactor));
+    if (viewport != null) {
+      final JViewport vp = viewport;
+      final double ratio = newFactor / oldFactor;
+      final Point target = new Point(
+        Math.max(0, (int) (anchor.x * ratio) - (anchor.x - view.x)),
+        Math.max(0, (int) (anchor.y * ratio) - (anchor.y - view.y)));
+      SwingUtilities.invokeLater(new Runnable() {
+        /** {@inheritDoc} */
+        public void run() { vp.setViewPosition(target); }
+      });
+    }
   }
 
   /**
@@ -314,6 +411,14 @@ DiagramEditorNotification, DiagramOperations, NodeChangeListener {
   public void paintComponent(Graphics g) {
     Rectangle clipBounds = new Rectangle();
     g.getClipBounds(clipBounds);
+    // the clip is in screen pixels, the diagram is drawn in scaled coordinates
+    double factor = scaling.getScaleFactor();
+    if (factor != 1.0) {
+      clipBounds = new Rectangle((int) Math.floor(clipBounds.x / factor) - 1,
+        (int) Math.floor(clipBounds.y / factor) - 1,
+        (int) Math.ceil(clipBounds.width / factor) + 3,
+        (int) Math.ceil(clipBounds.height / factor) + 3);
+    }
     paintComponent(g, clipBounds, true);
   }
 
@@ -604,7 +709,38 @@ DiagramEditorNotification, DiagramOperations, NodeChangeListener {
    */
   public void setScaling(Scaling aScaling) {
     scaling = aScaling;
+    setToDiagramSize();
+    revalidate();
     repaint();
+  }
+
+  /**
+   * Adjusts the zoom and the visible position so that all the elements of the
+   * diagram fit in the work area. The elements are not modified.
+   */
+  public void fitToWindow() {
+    if (!(getParent() instanceof JViewport)) return;
+    JViewport viewport = (JViewport) getParent();
+    java.awt.geom.Rectangle2D content = null;
+    for (DiagramElement child : diagram.getChildren()) {
+      java.awt.geom.Rectangle2D b = child.getAbsoluteBounds();
+      content = (content == null) ? b : content.createUnion(b);
+    }
+    if (content == null) {
+      setScaling(Scaling.SCALING_100);
+      viewport.setViewPosition(new java.awt.Point(0, 0));
+      return;
+    }
+    final double margin = 20;
+    Dimension extent = viewport.getExtentSize();
+    double factor = Math.min(1.0, Math.min(
+      extent.width / (content.getWidth() + 2 * margin),
+      extent.height / (content.getHeight() + 2 * margin)));
+    factor = Math.max(factor, 0.05);
+    setScaling(Scaling.of(factor));
+    viewport.setViewPosition(new java.awt.Point(
+      Math.max(0, (int) ((content.getX() - margin) * factor)),
+      Math.max(0, (int) ((content.getY() - margin) * factor))));
   }
 
   /**
