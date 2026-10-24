@@ -4,6 +4,9 @@
   <groupId>org.tinyuml</groupId>
   <artifactId>tinyuml</artifactId>
   <packaging>jar</packaging>
+  <properties>
+    <project.build.sourceEncoding>ISO-8859-1</project.build.sourceEncoding>
+  </properties>
   <version>0.13_02</version>
 
   <!-- dependencies section -->
@@ -12,7 +15,7 @@
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.0</version>
+      <version>4.13.2</version>
       <scope>test</scope>
       <optional>true</optional>
     </dependency>
@@ -47,19 +50,19 @@
     
     <!-- Batik  1.6 -->
     <dependency>
-      <groupId>batik</groupId>
+      <groupId>org.apache.xmlgraphics</groupId>
       <artifactId>batik-awt-util</artifactId>
-      <version>1.6-1</version>
+      <version>1.17</version>
     </dependency>
     <dependency>
-      <groupId>batik</groupId>
+      <groupId>org.apache.xmlgraphics</groupId>
       <artifactId>batik-svggen</artifactId>
-      <version>1.6-1</version>
+      <version>1.17</version>
     </dependency>
     <dependency>
-      <groupId>batik</groupId>
+      <groupId>org.apache.xmlgraphics</groupId>
       <artifactId>batik-util</artifactId>
-      <version>1.6-1</version>
+      <version>1.17</version>
     </dependency>
   </dependencies>
   
@@ -70,8 +73,8 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <source>1.6</source>
-          <target>1.6</target>
+          <release>8</release>
+          <encoding>ISO-8859-1</encoding>
         </configuration>
       </plugin>
       <plugin>
@@ -89,7 +92,9 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.22.2</version>
         <configuration>
+          <argLine>--add-opens java.base/java.lang=ALL-UNNAMED</argLine>
           <includes>
             <include>**/*Test.java</include>
           </includes>
@@ -112,22 +117,6 @@
             <descriptorRef>src</descriptorRef>
           </descriptorRefs>
         </configuration>
-      </plugin>
-      <plugin>
-	      <groupId>org.codehaus.mojo</groupId>
-	      <artifactId>exec-maven-plugin</artifactId>
-	      <version>1.1.1</version>
-	      <executions>
-		      <execution>
-			      <phase>verify</phase>
-			      <goals>
-				      <goal>java</goal>
-			      </goals>
-			      <configuration>
-				      <mainClass>org.tinyuml.Main</mainClass>
-			      </configuration>
-		      </execution>
-	      </executions>
       </plugin>
     </plugins>
   </build>
