@@ -23,6 +23,7 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Desktop;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
@@ -50,10 +51,16 @@ import org.tinyuml.draw.AbstractCompositeNode;
 import org.tinyuml.draw.Label;
 import org.tinyuml.draw.DiagramElement;
 import org.tinyuml.draw.LabelChangeListener;
+import org.tinyuml.model.NamedElement;
 import org.tinyuml.model.UmlModel;
+import org.tinyuml.umldraw.shared.NoteConnection;
 import org.tinyuml.umldraw.shared.NoteElement;
+import org.tinyuml.umldraw.shared.UmlDiagramElement;
+import org.tinyuml.umldraw.structure.Association;
 import org.tinyuml.umldraw.structure.ClassElement;
 import org.tinyuml.umldraw.structure.ComponentElement;
+import org.tinyuml.umldraw.structure.Dependency;
+import org.tinyuml.umldraw.structure.Inheritance;
 import org.tinyuml.umldraw.structure.PackageElement;
 import org.tinyuml.util.AppCommandListener;
 import org.tinyuml.umldraw.structure.StructureDiagram;
@@ -86,6 +93,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
   private JLabel coordLabel = new JLabel("    ");
   private JLabel memLabel = new JLabel("    ");
   private JLabel countLabel = new JLabel("    ");
+  private JLabel selectionLabel = new JLabel("    ");
   private UmlModel umlModel;
   private DiagramEditor currentEditor;
   private transient Timer timer = new Timer();
@@ -212,6 +220,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
     editorPanel.add(spane, BorderLayout.CENTER);
     editorPanel.add(toolbar, BorderLayout.NORTH);
     updateElementCount(currentEditor);
+    updateSelectionInfo(currentEditor);
     final Component comp = tabbedPane.add(diagram.getLabelText(), editorPanel);
     diagram.addNameLabelChangeListener(new LabelChangeListener() {
       /** {@inheritDoc} */
@@ -248,7 +257,10 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
   private void installStatusbar() {
     JPanel statusbar = new JPanel(new BorderLayout());
     statusbar.add(coordLabel, BorderLayout.WEST);
-    statusbar.add(countLabel, BorderLayout.CENTER);
+    JPanel infoPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
+    infoPanel.add(countLabel);
+    infoPanel.add(selectionLabel);
+    statusbar.add(infoPanel, BorderLayout.CENTER);
     statusbar.add(memLabel, BorderLayout.EAST);
     getContentPane().add(statusbar, BorderLayout.SOUTH);
   }
@@ -283,6 +295,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
    */
   public void stateChanged(DiagramEditor editor) {
     updateMenuAndToolbars(editor);
+    updateSelectionInfo(editor);
   }
 
   /**
@@ -318,6 +331,64 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
   }
 
   /**
+   * Shows the category and name of the selected element in the status bar.
+   * @param editor the editor
+   */
+  private void updateSelectionInfo(DiagramEditor editor) {
+    // the diagram background counts as "no selection"
+    java.util.List<DiagramElement> selected =
+      new java.util.ArrayList<DiagramElement>(editor.getSelectedElements());
+    selected.remove(editor.getDiagram());
+    if (selected.isEmpty()) {
+      selectionLabel.setText("Sin selecci\u00f3n");
+    } else if (selected.size() > 1) {
+      selectionLabel.setText(selected.size() + " elementos seleccionados");
+    } else {
+      DiagramElement element = selected.get(0);
+      String name = getElementName(element);
+      selectionLabel.setText("Selecci\u00f3n: " + getElementCategory(element)
+        + (name.length() > 0 ? " - " + name : ""));
+    }
+  }
+
+  /**
+   * Returns the category of the specified element.
+   * @param element the element
+   * @return the category name
+   */
+  private String getElementCategory(DiagramElement element) {
+    if (element instanceof PackageElement) return "Package";
+    if (element instanceof ClassElement) return "Class";
+    if (element instanceof ComponentElement) return "Component";
+    if (element instanceof NoteElement) return "Note";
+    if (element instanceof Association) return "Association";
+    if (element instanceof Inheritance) return "Inheritance";
+    if (element instanceof Dependency) return "Dependency";
+    if (element instanceof NoteConnection) return "Note connection";
+    return "Element";
+  }
+
+  /**
+   * Returns the name of the specified element, or an empty string if it has
+   * none.
+   * @param element the element
+   * @return the name
+   */
+  private String getElementName(DiagramElement element) {
+    String name = null;
+    if (element instanceof NoteElement) {
+      name = ((NoteElement) element).getLabelText();
+    } else if (element instanceof UmlDiagramElement) {
+      NamedElement model = ((UmlDiagramElement) element).getModelElement();
+      if (model != null) name = model.getName();
+    }
+    if (name == null) return "";
+    name = name.trim();
+    int newline = name.indexOf('\n');
+    return newline >= 0 ? name.substring(0, newline) + "..." : name;
+  }
+
+  /**
    * Counts the packages, classes, components and notes below the parent,
    * including nested ones.
    * @param parent the parent node
@@ -325,6 +396,8 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
    */
   private void countElements(AbstractCompositeNode parent, int[] counts) {
     for (DiagramElement child : parent.getChildren()) {
+      // a diagram nested inside the diagram is not an element to count
+      if (child instanceof StructureDiagram) continue;
       if (child instanceof PackageElement) counts[0]++;
       else if (child instanceof ClassElement) counts[1]++;
       else if (child instanceof ComponentElement) counts[2]++;
@@ -355,6 +428,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
    * {@inheritDoc}
    */
   public void selectionStateChanged() {
+    updateSelectionInfo(getCurrentEditor());
     boolean hasSelection = getCurrentEditor().getSelectedElements().size() > 0;
    
     menumanager.enableMenuItem("CUT", hasSelection);

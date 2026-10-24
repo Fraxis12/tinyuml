@@ -46,6 +46,7 @@ import javax.swing.event.UndoableEditEvent;
 import javax.swing.event.UndoableEditListener;
 import javax.swing.undo.UndoManager;
 import org.tinyuml.draw.Connection;
+import org.tinyuml.draw.Diagram;
 import org.tinyuml.model.RelationType;
 import org.tinyuml.draw.DiagramOperations;
 import org.tinyuml.draw.DiagramElement;
@@ -262,6 +263,9 @@ DiagramEditorNotification, DiagramOperations, NodeChangeListener {
 			new HashMap<DiagramElement, DiagramElement>();
 	
 	for(DiagramElement elem : elements){
+		// the diagram itself can be selected, but it cannot be pasted into
+		// itself (it would nest endlessly and freeze the editor)
+		if (elem instanceof Diagram) continue;
 		DiagramElement copia = (DiagramElement)elem.clone();
 		
 		// le cambiamos el parent al objeto clonado para poder ponerlo
